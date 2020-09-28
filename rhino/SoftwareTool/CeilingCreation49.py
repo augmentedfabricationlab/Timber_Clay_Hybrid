@@ -48,6 +48,11 @@ class Floorslabsystem:
         self.timberboards = []
         self.setup_done = False
 
+        self.prim_vert_sup = False
+        self.sec_vert_sup = False
+        self.vert_sup_lengths = None
+        self.vert_sup_gap_tolerance = 0.2
+        self.vert_sup_gap_min = 0.5
 
         # ADVANCED PARAMETERS
         self.advanced_setup = False
@@ -340,11 +345,18 @@ class Floorslabsystem:
             gap = 1
             i = 0
             height = board_layer[0].height
+            layer_width = board_layer[0].width
             while i < len(board_layer)-1:
                 width = None
                 # eliminate potential supporters that only exist in the middle
                 current_board = board_layer[i]
                 # make sure you don't catch the ones in the centre
+
+                ##########################
+                # HERE IS AN ISSUE WITH THE SHEARS IN ADVANCED SETUP
+                ##########################
+
+                # if it's a centre thing itself (unlikely case, though)
                 if current_board.length < layer_length and current_board.location == "centre":
                     i += 1
                     continue
@@ -352,7 +364,7 @@ class Floorslabsystem:
                 if current_board.length < layer_length and current_board.location == "centre":
                     gap += 1
                     continue
-                current_gap = next_board.grid_position - current_board.grid_position
+                current_gap = next_board.grid_position - current_board.grid_position - layer_width
                 # reset, we are doing that already now so we don't have to do it twice
                 i += gap
                 gap = 1
@@ -710,9 +722,9 @@ primary_length = 520.0
 secondary_length = 901.0
 omnidirectional = False
 primary_board_width_outside = 6.0
-primary_board_height_outside = 4.0
+primary_board_height_outside = 6.0
 primary_board_width_inside = 6.0
-primary_board_height_inside = 4.0
+primary_board_height_inside = 6.0
 primary_board_outside_dimensions = [primary_board_width_outside, primary_board_height_outside, primary_length]
 primary_board_inside_dimensions = [primary_board_width_inside, primary_board_height_inside, primary_length]
 secondary_board_width = 4.0
@@ -748,7 +760,5 @@ print(myFloorslab.weight_calculator())
 
 # bei den Instances Exports muss man noch aufpassen
 # print(myFloorslab.component_instances_export())
-
-
 
 

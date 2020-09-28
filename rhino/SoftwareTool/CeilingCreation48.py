@@ -48,6 +48,11 @@ class Floorslabsystem:
         self.timberboards = []
         self.setup_done = False
 
+        self.prim_vert_sup = False
+        self.sec_vert_sup = False
+        self.vert_sup_lengths = None
+        self.vert_sup_gap_tolerance = 0.2
+        self.vert_sup_gap_min = 0.5
 
         # ADVANCED PARAMETERS
         self.advanced_setup = False
@@ -703,7 +708,7 @@ class Floorslabsystem:
 
 # secondary_span_interval_development: 1 = constant, <1: denser in the centre, >1: denser on the edges
 # operable range approximately 0.6/6
-
+"""
 layer_no = 5
 gap_min = 4.0
 primary_length = 520.0
@@ -749,6 +754,6 @@ print(myFloorslab.weight_calculator())
 # bei den Instances Exports muss man noch aufpassen
 # print(myFloorslab.component_instances_export())
 
-
+"""
 
 
