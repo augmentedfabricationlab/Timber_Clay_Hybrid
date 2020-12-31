@@ -3,11 +3,9 @@ import copy
 import operator
 
 from compas.geometry import Point, Box, Frame, Vector, scale_vector, normalize_vector, Polygon, Rotation, is_point_in_polygon_xy, angle_vectors_signed
-from compas.datastructures import Mesh
-from compas.geometry import Line
+
 from compas.geometry import intersection_line_line_xy, distance_point_point, is_point_in_polygon_xy
 from compas.geometry import distance_point_point_xy
-from compas_ghpython.artists import MeshArtist
 from assembly_information_model.assembly import Element, Assembly
 from compas.geometry import Translation
 
@@ -57,7 +55,7 @@ def floorslab_creation(self):
         primary_graph_centre_maximum_x = primary_graph_centre_line_x + centre_ratio * primary_graph_centre_line_x
 
         # +.1 is a bit of a dirty fix against float inaccuracies
-        no_elements = ((primary_graph_centre_line_x - primary_graph_centre_minimum_x) + 0.1) // self.primary_interval
+        no_elements = ((primary_graph_centre_line_x - primary_graph_centre_minimum_x) + 0.001) // self.primary_interval
 
         primary_graph_centre_minimum_y = primary_graph_centre_line_y - 1000.0 * no_elements
         primary_graph_centre_maximum_y = primary_graph_centre_line_y + 1000.0 * no_elements
@@ -160,7 +158,6 @@ def floorslab_creation(self):
         secondary_graph_y_max = longspan_function(secondary_span_centre, "y")
         secondary_graph_y_min = secondary_graph_y_max * -1
         secondary_graph_y_step = secondary_graph_y_max / ((no_secondary_span_elements - 1) / 2)
-        # print(secondary_graph_y_min)
 
         # go through the function to get the final values
         secondary_graph_y_current = 0
@@ -180,8 +177,6 @@ def floorslab_creation(self):
         for val in range(len(secondary_graph_y_list_final)):
             secondary_graph_y_list_final[val] += self.primary_length / 2
 
-        # print(secondary_graph_y_list_final)
-
         secondary_span_grid = [[], [], []]
 
         for element in range(1, len(secondary_graph_y_list_final) - 1, 2):
@@ -200,24 +195,26 @@ def floorslab_creation(self):
     # adapts the advanced boards to meaningful lengths
     def __advanced_length_correction():
         # inside shear supports
-        position = 0
-        while self.primary_inside_support_length > self.floorslab_grids[1][0][position]:
-            position += 1
-        # //1 just to get a nicer number
-        self.primary_inside_support_length = ((self.floorslab_grids[1][0][position] + self.secondary_board_width / 2)
-                                              + self.secondary_board_width/2) // 1
-        self.primary_inside_support_dimensions[2] = self.primary_inside_support_length
+        if self.primary_inside_support_length > 0.0:
+            position = 0
+            while self.primary_inside_support_length > self.floorslab_grids[1][0][position]:
+                position += 1
+            # //1 just to get a nicer number
+            self.primary_inside_support_length = ((self.floorslab_grids[1][0][position] + self.secondary_board_width / 2)
+                                                  + self.secondary_board_width/2) // 1
+            self.primary_inside_support_dimensions[2] = self.primary_inside_support_length
 
         # outside momentum supports
-        outside_grid = self.floorslab_grids[1][0]
-        outside_centre_id = len(outside_grid) // 2
-        position = 1
-        while outside_grid[outside_centre_id + position] - outside_grid[outside_centre_id - position] < self.primary_outside_support_length:
-            position += 1
-        # //1 just to get a nicer number
-        self.primary_outside_support_length = ((outside_grid[outside_centre_id + position] - outside_grid[outside_centre_id - position]) +
-                                               self.secondary_board_width) // 1 + 1.0
-        self.primary_outside_support_dimensions[2] = self.primary_outside_support_length
+        if self.primary_outside_support_length > 0.0:
+            outside_grid = self.floorslab_grids[1][0]
+            outside_centre_id = len(outside_grid) // 2
+            position = 1
+            while outside_grid[outside_centre_id + position] - outside_grid[outside_centre_id - position] < self.primary_outside_support_length:
+                position += 1
+            # //1 just to get a nicer number
+            self.primary_outside_support_length = ((outside_grid[outside_centre_id + position] - outside_grid[outside_centre_id - position]) +
+                                                   self.secondary_board_width) // 1 + 1.0
+            self.primary_outside_support_dimensions[2] = self.primary_outside_support_length
 
     # makes sure that the program doesn't crash when the user/algorithm enters some nonsense
     def input_check():
@@ -291,8 +288,7 @@ def floorslab_creation(self):
                 if self.prim_vert_sup and self.sec_vert_sup:
                     myElement.length -= self.vertical_support_interlock * 2
                 myElement.width = self.vertical_support_width
-        if self.advanced_setup:
-            __advanced_length_correction()
+
 
         z_value = 0
         global_counter = 0
@@ -310,7 +306,7 @@ def floorslab_creation(self):
                         vert_sup = False
 
                     board_position = self.floorslab_grids[0][0][i]
-                    element_data_creator(primary_board_outside_dimensions, layer, global_counter, layer_counter, z_value,
+                    element_data_creator(self.primary_board_outside_dimensions, layer, global_counter, layer_counter, z_value,
                                          self.primary_direction, self.secondary_direction, board_position, vert_sup)
 
                     global_counter += 1
@@ -335,7 +331,7 @@ def floorslab_creation(self):
                             self.secondary_length - self.floorslab_grids[0][1][current_layer_counter] < self.primary_outside_support_distance_to_edge_max and
                             (last_piece.layer in self.primary_outside_support_layers or self.primary_outside_support_layers == [])
                         ):
-                            dims = [primary_board_outside_dimensions[0], primary_board_outside_dimensions[1],
+                            dims = [self.primary_board_outside_dimensions[0], self.primary_board_outside_dimensions[1],
                                     self.primary_outside_support_length]
                             element_data_creator(dims, layer, global_counter, layer_counter, z_value,
                                                  self.primary_direction, self.secondary_direction, self.floorslab_grids[0][1][current_layer_counter], False)
@@ -406,7 +402,7 @@ def floorslab_creation(self):
                     if self.advanced_setup and self.primary_inside_support_length > 0 and self.skipping:
                         iteration_counter = 0
                         fixed_global_counter = global_counter
-                        for i in range(len(self.floorslab_grids[0][0]) - 1, 0, -2):
+                        for i in range(len(self.floorslab_grids[0][0]) - 1, 1, -2):
                             iteration_counter += 1
                             current_layer_counter = self.network.node[i]["element"].no_in_layer - 1
                             # now check whether there should really be a board at that position
@@ -420,7 +416,7 @@ def floorslab_creation(self):
                                 self.secondary_length - self.floorslab_grids[0][0][i] < self.primary_inside_support_distance_to_edge_max and
                                 (self.primary_inside_support_layers == [] or layer in self.primary_inside_support_layers)):
 
-                                dims = [primary_board_inside_dimensions[0], primary_board_inside_dimensions[1],
+                                dims = [self.primary_board_inside_dimensions[0], self.primary_board_inside_dimensions[1],
                                         self.primary_inside_support_length]
 
                                 element_data_creator(dims, layer, global_counter, layer_counter, z_value,
@@ -543,9 +539,9 @@ def floorslab_creation(self):
                 my_board.length_vector = my_dir2
                 my_board.width_vector = my_dir1
 
-            old_centre = my_board.center
-            T = Translation(my_centre - old_centre)
-
+            old_centre = Point(my_board.center[0], my_board.center[1], my_board.center[2])
+            my_vec = Vector.from_start_end(old_centre, my_centre)
+            T = Translation.from_vector(my_vec)
             self.network.node[my_board.global_count]['x'] = my_centre[0]
             self.network.node[my_board.global_count]['y'] = my_centre[1]
             self.network.node[my_board.global_count]['z'] = my_centre[2]
@@ -881,7 +877,7 @@ def gluepoints(system):
                         system.network.edge[board.global_count][i] = system.network.node[other_board.global_count]
     return system
 
-
+"""
 def grasshopper_draw(system):
     def box_update(elmnt):
         elmnt.board_frame = Frame(elmnt.centre_point, elmnt.length_vector, elmnt.width_vector)
@@ -900,7 +896,7 @@ def grasshopper_draw(system):
         visualisations.append(box_visualisation)
 
     return visualisations
-
+"""
 
 def component_stack_export(system):
     stack = []
@@ -956,8 +952,8 @@ def weight_calculator(system, protective_clay_height=5.0, density_timber=460, de
         area = ((system.primary_length / 100) * (system.secondary_length / 100))
         unit_factor = 1000000
 
-        def calc_clay_volume(ar, clay_height, timber_vol, unit_fac):
-            total_vol = (total_height / 100 * ar)
+        def calc_clay_volume(ar, clay_hi, timber_vol, unit_fac):
+            total_vol = (clay_hi / 100 * ar)
             timber_vol /= unit_fac
             return total_vol - timber_vol
 
@@ -966,7 +962,8 @@ def weight_calculator(system, protective_clay_height=5.0, density_timber=460, de
         total_height = protective_clay_height
         timber_volume = 0.0
         clay_volume = 0.0
-
+        current_layer = -1
+        """
         for current_layer, board_layer in enumerate(system.timberboards):
             if fill_limit:
                 if current_layer == fill_limit:
@@ -974,9 +971,30 @@ def weight_calculator(system, protective_clay_height=5.0, density_timber=460, de
             total_height += board_layer[0].height
             for board in board_layer:
                 timber_volume += board.width * board.height * board.length
+       """
+        clay_total_height = protective_clay_height
+        clay_timber_volume = -1
+        for brd in system.elements():
+            board = brd[1]
+            if board.no_in_layer == 0:
+                current_layer += 1
+                total_height += board.height
+                if current_layer == fill_limit:
+                    clay_total_height = total_height
+                # at the beginning of the next layer, take the total timber volume
+                if current_layer == fill_limit+1:
+                    clay_timber_volume = timber_volume
 
-        if not fill_limit:
-            clay_volume = calc_clay_volume(area, total_height, timber_volume, unit_factor)
+            timber_volume += board.width * board.height * board.length
+
+        if not fill_limit or fill_limit > current_layer:
+            clay_timber_volume = timber_volume
+            clay_total_height = total_height
+        if clay_timber_volume == -1 and fill_limit or fill_limit == 0:
+            clay_timber_volume = 0
+            clay_total_height = protective_clay_height
+        clay_volume = calc_clay_volume(area, clay_total_height, clay_timber_volume, unit_factor)
+
         timber_volume /= unit_factor
         total_weight = clay_volume * density_clay + timber_volume * density_timber
         relative_weight = total_weight / area
@@ -1023,9 +1041,9 @@ def advanced_floorslab_setup(system, prim_in_sup_length, prim_out_sup_length, pr
 # operable range approximately 0.6/6
 layer_no = 5
 gap_min = 4.0
-primary_length = 500.0
-secondary_length = 92.0
-omnidirectional = False
+primary_length = 320.0
+secondary_length = 600.0
+omnidirectional = True
 primary_board_width_outside = 6.0
 primary_board_height_outside = 4.0
 primary_board_width_inside = 6.0
@@ -1036,9 +1054,9 @@ secondary_board_width = 8.0
 secondary_board_height = 4.0
 secondary_board_dimensions = [secondary_board_width, secondary_board_height, secondary_length]
 
-primary_interval = 28.0
+primary_interval = 12
 primary_falloff = 100.0
-primary_dedensification = 1
+primary_dedensification = 2
 secondary_interval = 24.0
 secondary_interval_development = 1.0
 skip_centrals = True
@@ -1053,30 +1071,30 @@ origin_frame = Frame(origin_point, origin_vector_primary, origin_vector_secondar
 
 Slabassembly = Assembly()
 Slabassembly.layer_no = layer_no
-Slabassembly.gap_min = gap_min
-Slabassembly.primary_length = primary_length
-Slabassembly.secondary_length = secondary_length
+Slabassembly.gap_min = gap_min/100
+Slabassembly.primary_length = primary_length/100
+Slabassembly.secondary_length = secondary_length/100
 Slabassembly.omnidirectional = omnidirectional
-Slabassembly.primary_board_width_outside = primary_board_width_outside
-Slabassembly.primary_board_height_outside = primary_board_height_outside
-Slabassembly.primary_board_width_inside = primary_board_width_inside
-Slabassembly.primary_board_height_inside = primary_board_height_inside
+Slabassembly.primary_board_width_outside = primary_board_width_outside/100
+Slabassembly.primary_board_height_outside = primary_board_height_outside/100
+Slabassembly.primary_board_width_inside = primary_board_width_inside/100
+Slabassembly.primary_board_height_inside = primary_board_height_inside/100
 Slabassembly.primary_board_outside_dimensions = [Slabassembly.primary_board_width_outside,
                                                  Slabassembly.primary_board_height_outside, Slabassembly.primary_length]
 Slabassembly.primary_board_inside_dimensions = [Slabassembly.primary_board_width_inside,
                                                 Slabassembly.primary_board_height_inside, Slabassembly.primary_length]
-Slabassembly.secondary_board_width = secondary_board_width
-Slabassembly.secondary_board_height = secondary_board_height
+Slabassembly.secondary_board_width = secondary_board_width/100
+Slabassembly.secondary_board_height = secondary_board_height/100
 Slabassembly.secondary_board_dimensions = [Slabassembly.secondary_board_width, Slabassembly.secondary_board_height,
                                            Slabassembly.secondary_length]
-Slabassembly.primary_interval = primary_interval
+Slabassembly.primary_interval = primary_interval/100
 if Slabassembly.omnidirectional:
-    Slabassembly.primary_falloff = primary_falloff
-    Slabassembly.primary_dedensification = primary_falloff
+    Slabassembly.primary_falloff = primary_falloff/100
+    Slabassembly.primary_dedensification = primary_dedensification
 else:
     Slabassembly.primary_falloff = 0.0
     Slabassembly.primary_dedensification = 0
-Slabassembly.secondary_interval = secondary_interval
+Slabassembly.secondary_interval = secondary_interval/100
 Slabassembly.secondary_interval_development = secondary_interval_development
 Slabassembly.skipping = skip_centrals
 Slabassembly.primary_direction = 0
@@ -1092,22 +1110,25 @@ Slabassembly.setup_done = False
 Slabassembly.prim_vert_sup = True
 Slabassembly.sec_vert_sup = False
 Slabassembly.vert_sup_lengths = None
-Slabassembly.vert_sup_gap_tolerance = 0.2
-Slabassembly.vert_sup_gap_min = 0.5
+Slabassembly.vert_sup_gap_tolerance = 0.002
+Slabassembly.vert_sup_gap_min = 0.005
 
 # ADVANCED PARAMETERS
-Slabassembly.vertical_support_width = 12.0
-Slabassembly.vertical_support_interlock = 10.0
-Slabassembly.gluepathwidth = .3
-Slabassembly.advanced_setup = True
+Slabassembly.vertical_support_width = 12.0/100
+Slabassembly.vertical_support_interlock = 10.0/100
+Slabassembly.gluepathwidth = .3/100
+Slabassembly.advanced_setup = False
 
-advanced_floorslab_setup(Slabassembly, 70.0, 70.0)
+advanced_floorslab_setup(Slabassembly, 0.0, 0.0)
 floorslab_creation(Slabassembly)
 gluepoints(Slabassembly)
+weight_calculator(Slabassembly, protective_clay_height=5.0, fill_limit=1, density_clay=1900)
 
 
+myboard = Slabassembly.network.node[1]
+mine = myboard["element"].box
 
-
-
+print("hello")
 # secondary_span_interval_development: 1 = constant, <1: denser in the centre, >1: denser on the edges
 # operable range approximately 0.6/6
+

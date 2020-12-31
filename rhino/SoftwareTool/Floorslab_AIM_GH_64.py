@@ -3,11 +3,9 @@ import copy
 import operator
 
 from compas.geometry import Point, Box, Frame, Vector, scale_vector, normalize_vector, Polygon, Rotation, is_point_in_polygon_xy, angle_vectors_signed
-from compas.datastructures import Mesh
-from compas.geometry import Line
+
 from compas.geometry import intersection_line_line_xy, distance_point_point, is_point_in_polygon_xy
 from compas.geometry import distance_point_point_xy
-from compas_ghpython.artists import MeshArtist
 from assembly_information_model.assembly import Element, Assembly
 from compas.geometry import Translation
 
@@ -310,7 +308,7 @@ def floorslab_creation(self):
                         vert_sup = False
 
                     board_position = self.floorslab_grids[0][0][i]
-                    element_data_creator(primary_board_outside_dimensions, layer, global_counter, layer_counter, z_value,
+                    element_data_creator(self.primary_board_outside_dimensions, layer, global_counter, layer_counter, z_value,
                                          self.primary_direction, self.secondary_direction, board_position, vert_sup)
 
                     global_counter += 1
@@ -335,7 +333,7 @@ def floorslab_creation(self):
                             self.secondary_length - self.floorslab_grids[0][1][current_layer_counter] < self.primary_outside_support_distance_to_edge_max and
                             (last_piece.layer in self.primary_outside_support_layers or self.primary_outside_support_layers == [])
                         ):
-                            dims = [primary_board_outside_dimensions[0], primary_board_outside_dimensions[1],
+                            dims = [self.primary_board_outside_dimensions[0], self.primary_board_outside_dimensions[1],
                                     self.primary_outside_support_length]
                             element_data_creator(dims, layer, global_counter, layer_counter, z_value,
                                                  self.primary_direction, self.secondary_direction, self.floorslab_grids[0][1][current_layer_counter], False)
@@ -420,7 +418,7 @@ def floorslab_creation(self):
                                 self.secondary_length - self.floorslab_grids[0][0][i] < self.primary_inside_support_distance_to_edge_max and
                                 (self.primary_inside_support_layers == [] or layer in self.primary_inside_support_layers)):
 
-                                dims = [primary_board_inside_dimensions[0], primary_board_inside_dimensions[1],
+                                dims = [self.primary_board_inside_dimensions[0], self.primary_board_inside_dimensions[1],
                                         self.primary_inside_support_length]
 
                                 element_data_creator(dims, layer, global_counter, layer_counter, z_value,
@@ -543,9 +541,9 @@ def floorslab_creation(self):
                 my_board.length_vector = my_dir2
                 my_board.width_vector = my_dir1
 
-            old_centre = my_board.center
-            T = Translation(my_centre - old_centre)
-
+            old_centre = Point(my_board.center[0], my_board.center[1], my_board.center[2])
+            my_vec = Vector.from_start_end(old_centre, my_centre)
+            T = Translation.from_vector(my_vec)
             self.network.node[my_board.global_count]['x'] = my_centre[0]
             self.network.node[my_board.global_count]['y'] = my_centre[1]
             self.network.node[my_board.global_count]['z'] = my_centre[2]
@@ -881,7 +879,7 @@ def gluepoints(system):
                         system.network.edge[board.global_count][i] = system.network.node[other_board.global_count]
     return system
 
-
+"""
 def grasshopper_draw(system):
     def box_update(elmnt):
         elmnt.board_frame = Frame(elmnt.centre_point, elmnt.length_vector, elmnt.width_vector)
@@ -900,7 +898,7 @@ def grasshopper_draw(system):
         visualisations.append(box_visualisation)
 
     return visualisations
-
+"""
 
 def component_stack_export(system):
     stack = []
@@ -1021,6 +1019,7 @@ def advanced_floorslab_setup(system, prim_in_sup_length, prim_out_sup_length, pr
 
 # secondary_span_interval_development: 1 = constant, <1: denser in the centre, >1: denser on the edges
 # operable range approximately 0.6/6
+"""
 layer_no = 5
 gap_min = 4.0
 primary_length = 500.0
@@ -1106,8 +1105,10 @@ floorslab_creation(Slabassembly)
 gluepoints(Slabassembly)
 
 
+myboard = Slabassembly.network.node[1]
+mine = myboard["element"].box
 
-
-
+print("hello")
 # secondary_span_interval_development: 1 = constant, <1: denser in the centre, >1: denser on the edges
 # operable range approximately 0.6/6
+"""
