@@ -20,6 +20,7 @@ from compas.geometry import distance_point_point
 from compas.datastructures import Network, mesh_offset
 
 import math
+import pprint
 
 # from timber_clay_hybrid.export import Exporter
 from element_TCH import TCHElement
@@ -178,7 +179,7 @@ class TCHAssembly(Assembly):
                 else:
                     # unexplainable math function; derived from differential
                     x_value = ((b * -1) + math.sqrt(b ** 2 - 4 * a * (-y))) / (2 * a)
-                    if x_value < 1:
+                    if x_value < .01:
                         x_value = self.primary_board_width_outside / 2
                     return x_value
 
@@ -276,6 +277,7 @@ class TCHAssembly(Assembly):
                 secondary_span_grid[j][0] = self.secondary_board_width / 2
                 secondary_span_grid[j][len(secondary_span_grid[j]) - 1] = self.primary_length - self.secondary_board_width / 2
 
+            print(primary_span_grid)
             print(secondary_span_grid)
 
             return primary_span_grid, secondary_span_grid
@@ -489,7 +491,7 @@ class TCHAssembly(Assembly):
                     boardheight = self.primary_board_height_inside
                     z_value += boardheight
                     # no dedensification on the inside
-                    print(self.skipping)
+
                     if self.skipping < 2:
                         for i in range(len(self.floorslab_grids[0][0])):
                             if self.sec_vert_sup and (i == 0 or i == len(self.floorslab_grids[0][0]) - 1):
@@ -621,10 +623,9 @@ class TCHAssembly(Assembly):
                 __advanced_length_correction()
             __board_data_setup(self.advanced_setup)
             self.setup_done = True
-            return self
         else:
             print("didn't pass input check")
-            return 1
+
 
     def component_instances_export(self):
         global_boards = []
@@ -1066,33 +1067,33 @@ class TCHAssembly(Assembly):
                 else:
                     safety_distance_glue = safety_distance_gluepoints
 
+                my_board.path = {"pick_points": [], "glue_points": [], "safety_glue_point": None, "drop_points": []}
+
                 # first head to the stack
                 safety_frame_stack = safety_frame_creator(my_board.stack_pick_frame)
-                path = [(safety_frame_stack, ["free"]), (my_board.stack_pick_frame, ["cart"]), (safety_frame_stack, ["cart"])]
-                safety_frame_drop_motion_type = "free"
+                my_board.path["pick_points"] = [safety_frame_stack, my_board.stack_pick_frame, safety_frame_stack]
+
                 # now head to the glue part
                 if len(my_board.final_glue_frames) > 0:
-
-                    path.append((safety_frame_creator(my_board.final_glue_frames[0][0]), ["free"]))
+                    my_board.path["glue_points"].append(safety_frame_creator(my_board.final_glue_frames[0][0]))
                     for i, gluepath in enumerate(my_board.final_glue_frames):
                         if i > 0:
-                            path.append((safety_frame_creator(gluepath[0], safety_distance_glue), ["cart"]))
+                            my_board.path["glue_points"].append(safety_frame_creator(gluepath[0], safety_distance_glue))
                         for point in gluepath:
-                            path.append((point, ["cart"]))
+                            my_board.path["glue_points"].append(point)
                         if i < len(my_board.final_glue_frames) - 1:
-                            path.append((safety_frame_creator(gluepath[-1], safety_distance_glue), ["cart"]))
-                    path.append((safety_frame_creator(my_board.final_glue_frames[-1][-1]), ["cart"]))
+                            my_board.path["glue_points"].append(safety_frame_creator(gluepath[-1], safety_distance_glue))
+                    my_board.path["glue_points"].append(safety_frame_creator(my_board.final_glue_frames[-1][-1]))
 
                     # now head to the drop zone
                     if flipped_dropframe_distance and glue_station_default_frame:
                         safety_frame_drop_flipped = flipped_safety_frame(my_board.tool_frame)
-                        path.append((safety_frame_drop_flipped, ["cart"]))
-                    safety_frame_drop_motion_type = "cart"
+                        my_board.path["safety_glue_point"] = safety_frame_drop_flipped
+
                 safety_frame_drop = safety_frame_creator(my_board.tool_frame)
-                path.append((safety_frame_drop, [safety_frame_drop_motion_type]))
-                path.append((my_board.tool_frame, ["cart"]))
-                path.append((safety_frame_drop, ["cart"]))
-                return path
+                my_board.path["drop_points"].append(safety_frame_drop)
+                my_board.path["drop_points"].append(my_board.tool_frame)
+                my_board.path["drop_points"].append(safety_frame_drop)
 
             # actual procedure
             for layer_number in range(1, self.layer_no):
@@ -1100,7 +1101,7 @@ class TCHAssembly(Assembly):
                     board = brd[1]
                     if board.layer < layer_number or dryrun:
                         # exclude the first layer of boards
-                        board.assembly_path = create_assembly_path(board)
+                        create_assembly_path(board)
                         continue
                     elif board.layer > layer_number:
                         break
@@ -1127,7 +1128,7 @@ class TCHAssembly(Assembly):
                     else:
                         relative_gluepoints_converter(board, gluestation=False)
                     if safety_distance:
-                        board.assembly_path = create_assembly_path(board)
+                        create_assembly_path(board)
                     else:
                         print("Warning: No assembly path created because no Safety Distance was given")
             return self
@@ -1148,7 +1149,7 @@ class TCHAssembly(Assembly):
                     no_columns = no_elements // max_height
                     if no_elements % max_height != 0:
                         no_columns += 1
-                    print("no_elements: {}, no_cols: {}, max_height: {}".format(no_elements, no_columns, max_height))
+                    #print("no_elements: {}, no_cols: {}, max_height: {}".format(no_elements, no_columns, max_height))
                     overflow = max_height * no_columns - no_elements
                     if overflow > no_columns:
                         no_rows = max_height - overflow // no_columns
@@ -1180,7 +1181,7 @@ class TCHAssembly(Assembly):
                     first_column_position += no_columns * profile_width + (no_columns // max_width) * distance_within_stack \
                                              + distance_between_stacks
 
-            # print("")
+
             # now that the stacks have been created, we can assign boards to them
 
             # stupid function to add vectors and points because it doesn't work somehow
@@ -1209,9 +1210,6 @@ class TCHAssembly(Assembly):
                         pick_y = my_stack["first_column_position"] + col * my_stack["profile_width"] + col // max_width * distance_within_stack
                         pick_z = row * my_stack["profile_height"] + my_stack["profile_height"]
                         stack_origin_point = stack_origin_frame[0]
-                        print(stack_origin_point)
-                        print(stack_origin_frame)
-                        print("\n")
                         pick_point = vector_point_addition([stack_origin_point, stack_origin_frame[1] * pick_x,
                                                             stack_origin_frame[2] * pick_y, Vector(0, 0, 1) * pick_z])
                         #pick_vector = Vector(stack_origin_frame[1]) * pick_x + stack_origin_frame[2] * pick_y + Vector(0, 0, 1) * pick_z
@@ -1230,13 +1228,11 @@ class TCHAssembly(Assembly):
         gluepoints()
         print("hello")
 
-
-
 origin_point = Point(0, 0, 0)
 origin_vector_primary = Vector(0, 1, 0)
 origin_vector_secondary = Vector(1, 0, 0)
 origin_frame = Frame(origin_point, origin_vector_primary, origin_vector_secondary)
-my_floorslab = TCHAssembly(5, 0.01, 3.0, 2.5, False, 0.06, 0.04, 0.06, 0.04, 0.06, 0.04, 0.1, 0.5, 2, 0.2, 1.2, True, origin_frame, True, True, 0.04, 0.04)
+my_floorslab = TCHAssembly(5, 0.01, 3.0, 2.5, True, 0.06, 0.04, 0.06, 0.04, 0.06, 0.04, 0.1, 0.9, 2, 0.2, 1.1, True, origin_frame, True, True, 0.04, 0.04)
 
-my_geometry = my_floorslab.floorslab_geometry_creation()
+my_floorslab.floorslab_geometry_creation()
 my_floorslab.assembly_creation(origin_frame, safety_distance=0.4)
