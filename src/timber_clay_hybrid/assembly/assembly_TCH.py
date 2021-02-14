@@ -26,70 +26,255 @@ import pprint
 from element_TCH import TCHElement
 
 
+def optional_parameter_setup(dic, key, default_value):
+    if key in dic.keys():
+        target = dic[key]
+    else:
+        target = default_value
+    return target
+
+
 class TCHAssembly(Assembly):
     """A data structure for discrete element assemblies for human robot collaboration
     """
 
-    def __init__(self,
-                 layer_no_input, gap_min_input, primary_length_input, secondary_length_input, omnidirectional_input, primary_board_width_outside_input,
-                 primary_board_height_outside_input, primary_board_width_inside_input, primary_board_height_inside_input, secondary_board_width_input,
-                 secondary_board_height_input, primary_interval_input, primary_falloff_input, primary_dedensification_input, secondary_interval_input,
-                 secondary_interval_development_input, skip_centrals_input, origin_frame_input, prim_vert_sup_input=False, sec_vert_sup_input=False,
-                 vertical_support_interlock_input=None, vertical_support_width_input=None, flip_toolframe_prim_input=False, flip_toolframe_sec_input=False):
+    def __init__(self):
 
         super(TCHAssembly, self).__init__()
+        # Grid
+        self.grid_set = False
+        self.layer_no = None
+        self.gap_min = 0.0
+        self.primary_length = None
+        self.secondary_length = None
+        self.primary_interval = None
+        self.secondary_interval = None
+        self.secondary_interval_development = None
+        self.skipping = 0
+        self.floorslab_grids = []
 
-        self.layer_no = layer_no_input
-        self.gap_min = gap_min_input
-        self.primary_length = primary_length_input
-        self.secondary_length = secondary_length_input
-        self.omnidirectional = omnidirectional_input
-        self.primary_board_width_outside = primary_board_width_outside_input
-        self.primary_board_height_outside = primary_board_height_outside_input
-        self.primary_board_width_inside = primary_board_width_inside_input
-        self.primary_board_height_inside = primary_board_height_inside_input
-        self.primary_board_outside_dimensions = [self.primary_board_width_outside,
-                                                 self.primary_board_height_outside, self.primary_length]
-        self.primary_board_inside_dimensions = [self.primary_board_width_inside,
-                                                self.primary_board_height_inside, self.primary_length]
-        self.secondary_board_width = secondary_board_width_input
-        self.secondary_board_height = secondary_board_height_input
-        self.secondary_board_dimensions = [self.secondary_board_width, self.secondary_board_height,
-                                           self.secondary_length]
-        self.primary_interval = primary_interval_input
-        if self.omnidirectional and primary_falloff_input and primary_dedensification_input:
-            self.primary_falloff = primary_falloff_input
-            self.primary_dedensification = primary_dedensification_input
-        else:
-            self.primary_falloff = 0.0
-            self.primary_dedensification = 0
-        self.secondary_interval = secondary_interval_input
-        self.secondary_interval_development = secondary_interval_development_input
-        self.skipping = skip_centrals_input
-        self.primary_direction = 0
-        self.secondary_direction = 1
-        self.origin_fr = origin_frame_input
-        self.origin_pt = self.origin_fr[0]
-        self.prim_dir = self.origin_fr[1]
-        self.sec_dir = self.origin_fr[2]
-        self.sec_fr = Frame(self.origin_pt, self.sec_dir, self.prim_dir)
-        self.flip_toolframe_prim = flip_toolframe_prim_input
-        self.flip_toolframe_sec = flip_toolframe_sec_input
+        # Board dimensions
+        self.board_dimensions_set = False
+        self.primary_board_outside_dimensions = None
+        self.primary_board_width_outside = None
+        self.primary_board_height_outside = None
+        self.primary_board_inside_dimensions = None
+        self.primary_board_width_inside = None
+        self.primary_board_height_inside = None
+        self.secondary_board_dimensions = None
+        self.secondary_board_width = None
+        self.secondary_board_height = None
 
-        self.setup_done = False
+        # Omnidirectional
+        self.omnidirectional = False
+        self.primary_falloff = 0.0
+        self.primary_dedensification = 0.0
 
         # Vertical Support
-        self.prim_vert_sup = prim_vert_sup_input
-        self.sec_vert_sup = sec_vert_sup_input
-        self.vertical_support_width = vertical_support_width_input
-        self.vertical_support_interlock = vertical_support_interlock_input
+        self.prim_vert_sup = False
+        self.sec_vert_sup = False
+        self.vertical_support_width = None
+        self.vertical_support_interlock = None
 
-        # ADVANCED PARAMETERS
+        # Baseplane Setup
+        self.base_plane_set = False
+        self.primary_direction = 0
+        self.secondary_direction = 1
+        self.origin_fr = None
+        self.origin_pt = None
+        self.sec_fr = None
+        self.flip_toolframe_prim = None
+        self.flip_toolframe_sec = None
+
+        # Advanced Setup
         self.advanced_setup = False
-        self.gluepathwidth = None
+        self.primary_inside_support_length = None
+        self.primary_outside_support_length = None
+        self.primary_outside_support_dimensions = None
+        self.primary_inside_support_dimensions = None
+        self.primary_outside_support_gap_min = None
+        self.primary_inside_support_gap_min = None
+        self.primary_outside_support_distance_to_edge_min = None
+        self.primary_outside_support_distance_to_edge_max = None
+        self.primary_outside_support_layers = None
+        self.primary_inside_support_distance_to_edge_min = None
+        self.primary_inside_support_distance_to_edge_max = None
+        self.primary_inside_support_layers = None
+
+        # Assembly Sequence
+        self.assembly_sequence_set = False
+        self.stack_origin_frame = None
+        self.max_stack_height = None
+        self.max_stack_width = None
+        self.stack_bottom_pickup = None
+        self.stack_col_pickup = None
+        self.distance_between_stacks = None
+        self.stack_full_efficiency = None
+        self.glue_snake = None
+        self.gluepath_width = None
+        self.glue_station_default_frame = None
+        self.safety_distance = None
+        self.safety_distance_gluepoints = None
+        self.dryrun = None
+        self.flipped_dropframe_distance = None
+        self.sorting_direction = None
+        self.sorting_flipped = None
+        self.bending_behaviour = None
+        self.geometry_created = False
+
+    def set_grid(self, grid_setup):
+        self.grid_set = True
+        self.layer_no = grid_setup["layer_no"]
+        self.primary_length = grid_setup["primary_length"]
+        self.secondary_length = grid_setup["secondary_length"]
+        self.primary_interval = grid_setup["primary_interval"]
+        self.secondary_interval = grid_setup["secondary_interval"]
+        if "secondary_interval_development" in grid_setup.keys():
+            self.secondary_interval_development = grid_setup["secondary_interval_development"]
+        if "skip_centrals" in grid_setup:
+            self.skipping = grid_setup["skip_centrals"]
+        if "gap_min" in grid_setup.keys():
+            self.gap_min = grid_setup["gap_min"]
+
+    def set_board_formats(self, board_formats):
+        self.board_dimensions_set = True
+        self.primary_board_outside_dimensions = board_formats["prim_board_outside_dimensions"]
+        self.primary_board_outside_dimensions.append(self.primary_length)
+        self.primary_board_width_outside = self.primary_board_outside_dimensions[0]
+        self.primary_board_height_outside = self.primary_board_outside_dimensions[1]
+
+        if "prim_board_inside_dimensions" in board_formats.keys():
+            self.primary_board_inside_dimensions = board_formats["prim_board_inside_dimensions"]
+            self.primary_board_inside_dimensions.append(self.primary_length)
+            self.primary_board_width_inside= self.primary_board_inside_dimensions[0]
+            self.primary_board_height_inside = self.primary_board_inside_dimensions[1]
+        else:
+            self.primary_board_inside_dimensions = board_formats["prim_board_outside_dimensions"]
+            self.primary_board_inside_dimensions.append(self.primary_length)
+            self.primary_board_width_inside = self.primary_board_outside_dimensions[0]
+            self.primary_board_height_inside = self.primary_board_outside_dimensions[1]
+
+        self.secondary_board_dimensions = board_formats["sec_board_inside_dimensions"]
+        self.secondary_board_dimensions.append(self.secondary_length)
+        self.secondary_board_width = self.secondary_board_dimensions[0]
+        self.secondary_board_height = self.secondary_board_dimensions[1]
+
+    def set_vertical_support(self, vert_sup_setup):
+        self.prim_vert_sup = vert_sup_setup["prim_vert_sup"]
+        self.sec_vert_sup = vert_sup_setup["sec_vert_sup"]
+        self.vertical_support_width = vert_sup_setup["vertical_support_width"]
+        self.vertical_support_interlock = vert_sup_setup["vertical_support_interlock"]
+
+    def set_omnidirectionality(self, omni_setup):
+        self.omnidirectional = True
+        self.primary_falloff = omni_setup["primary_falloff"]
+        self.primary_dedensification = omni_setup["primary_dedensification"]
+
+    def set_base_plane(self, base_plane_setup):
+        self.base_plane_set = True
+        self.origin_fr = base_plane_setup["origin_frame"]
+        self.origin_pt = self.origin_fr[0]
+        prim_dir = self.origin_fr[1]
+        sec_dir = self.origin_fr[2]
+        self.sec_fr = Frame(self.origin_pt, sec_dir, prim_dir)
+        if "primary_direction" in base_plane_setup.keys():
+            self.primary_direction = base_plane_setup["primary_direction"]
+        if "secondary_direction" in base_plane_setup.keys():
+            self.secondary_direction = base_plane_setup["secondary_direction"]
+        if "flip_toolframe_prim" in base_plane_setup.keys():
+            self.flip_toolframe_prim = base_plane_setup["flip_toolframe_prim"]
+        if "flip_toolframe_sec" in base_plane_setup.keys():
+            self.flip_toolframe_sec = base_plane_setup["flip_toolframe_sec"]
+
+    def set_advanced_parameters(self, advanced_params_setup):
+        if self.board_dimensions_set:
+            self.advanced_setup = True
+            if "shear_support_length" in advanced_params_setup.keys():
+                self.primary_inside_support_length = advanced_params_setup["shear_support_length"]
+            if "momentum_support_length" in advanced_params_setup.keys():
+                self.primary_outside_support_length = advanced_params_setup["momentum_support_length"]
+            if "shear_support_dimensions" in advanced_params_setup.keys():
+                self.primary_inside_support_dimensions = advanced_params_setup["shear_support_dimensions"]
+            else:
+                self.primary_inside_support_dimensions = self.primary_board_inside_dimensions
+            if "momentum_support_dimensions" in advanced_params_setup.keys():
+                self.primary_outside_support_dimensions = advanced_params_setup["momentum_support_dimensions"]
+            else:
+                self.primary_outside_support_dimensions = self.primary_board_outside_dimensions
+
+            if "primary_outside_support_gap_min" in advanced_params_setup.keys():
+                self.primary_outside_support_gap_min = advanced_params_setup["primary_outside_support_gap_min"]
+            else:
+                self.primary_outside_support_gap_min = self.gap_min
+
+            if "primary_inside_support_gap_min" in advanced_params_setup.keys():
+                self.primary_inside_support_gap_min = advanced_params_setup["primary_inside_support_gap_min"]
+            else:
+                self.primary_inside_support_gap_min = self.gap_min
+
+            self.primary_outside_support_distance_to_edge_min = None
+            self.primary_outside_support_distance_to_edge_max = None
+            self.primary_outside_support_layers = None
+            self.primary_inside_support_distance_to_edge_min = None
+            self.primary_inside_support_distance_to_edge_max = None
+            self.primary_inside_support_layers = None
+
+            if "primary_outside_support_distance_to_edge_min" in advanced_params_setup.keys():
+                self.primary_outside_support_distance_to_edge_min = advanced_params_setup["primary_outside_support_distance_to_edge_min"]
+            else:
+                self.primary_outside_support_distance_to_edge_min = 0.0
+
+            if "primary_outside_support_distance_to_edge_max" in advanced_params_setup.keys():
+                self.primary_outside_support_distance_to_edge_max = advanced_params_setup["primary_outside_support_distance_to_edge_max"]
+            else:
+                self.primary_outside_support_distance_to_edge_max = 0.0
+
+            if "primary_inside_support_distance_to_edge_max" in advanced_params_setup.keys():
+                self.primary_inside_support_distance_to_edge_max = advanced_params_setup["primary_inside_support_distance_to_edge_max"]
+            else:
+                self.primary_inside_support_distance_to_edge_max = 0.0
+
+            if "primary_inside_support_distance_to_edge_min" in advanced_params_setup.keys():
+                self.primary_inside_support_distance_to_edge_min = advanced_params_setup["primary_inside_support_distance_to_edge_min"]
+            else:
+                self.primary_inside_support_distance_to_edge_min = 0.0
+
+            if "primary_outside_support_layers" in advanced_params_setup.keys():
+                self.primary_outside_support_layers = advanced_params_setup["primary_outside_support_layers"]
+            else:
+                self.primary_outside_support_layers = []
+
+            if "primary_inside_support_layers" in advanced_params_setup.keys():
+                self.primary_inside_support_layers = advanced_params_setup["primary_inside_support_layers"]
+            else:
+                self.primary_inside_support_layers = []
+
+        else:
+            print("Warning: Advanced setup ignored because board formats and/or grid were not set up yet.")
+
+    def set_assembly_sequence_parameters(self, assembly_sequence_setup):
+        self.assembly_sequence_set = True
+        self.stack_origin_frame = assembly_sequence_setup["stack_origin_frame"]
+        self.max_stack_height = optional_parameter_setup(assembly_sequence_setup, "max_stack_height", 10)
+        self.max_stack_width = optional_parameter_setup(assembly_sequence_setup, "max_stack_width", 4)
+        self.stack_bottom_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_bottom_pickup", 0)
+        self.stack_col_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_col_pickup", 0)
+        self.distance_between_stacks = optional_parameter_setup(assembly_sequence_setup, "distance_between_stacks", 0.08)
+        self.distance_between_stacks = optional_parameter_setup(assembly_sequence_setup, "distance_between_stacks", 0.12)
+        self.stack_full_efficiency = optional_parameter_setup(assembly_sequence_setup, "stack_full_efficiency", True)
+        self.glue_snake = optional_parameter_setup(assembly_sequence_setup, "glue_snake", False)
+        self.gluepath_width = optional_parameter_setup(assembly_sequence_setup, "gluepath_width", .004)
+        self.glue_station_default_frame = optional_parameter_setup(assembly_sequence_setup, "glue_station_default_frame", None)
+        self.safety_distance = optional_parameter_setup(assembly_sequence_setup, "safety_distance", .5)
+        self.safety_distance_gluepoints = optional_parameter_setup(assembly_sequence_setup, "safety_distance_gluepoints", None)
+        self.dryrun = optional_parameter_setup(assembly_sequence_setup, "dryrun", False)
+        self.flipped_dropframe_distance = optional_parameter_setup(assembly_sequence_setup, "flipped_dropframe_distance", None)
+        self.sorting_direction = optional_parameter_setup(assembly_sequence_setup, "sorting_direction", 1)
+        self.sorting_flipped = optional_parameter_setup(assembly_sequence_setup, "sorting_flipped", False)
+        self.bending_behaviour = optional_parameter_setup(assembly_sequence_setup, "bending_behaviour", None)
 
     # default setup that collects the relevant functions
-    def floorslab_geometry_creation(self):
+    def create_assembly_geometry(self):
         # calculates the basic centre lines
         # basically just a list of numbers, the rest comes later
         def __grid_creation():
@@ -519,7 +704,7 @@ class TCHAssembly(Assembly):
                             layer_counter += 1
 
                         # last element??
-                        if len(self.floorslab_grids[0][0]) % 2 != 1:
+                        if len(self.floorslab_grids[0][0]) % self.skipping != 1:
                             if self.sec_vert_sup:
                                 vert_sup = True
                             else:
@@ -616,18 +801,16 @@ class TCHAssembly(Assembly):
                         global_counter += 1
                         layer_counter += 1
 
-        if input_check():
-            self.floorslab_grids = []
+        if input_check() and self.board_dimensions_set and self.grid_set and self.base_plane_set:
             self.floorslab_grids = __grid_creation()
             if self.advanced_setup:
                 __advanced_length_correction()
             __board_data_setup(self.advanced_setup)
-            self.setup_done = True
+            self.geometry_created = True
         else:
             print("didn't pass input check")
 
-
-    def component_instances_export(self):
+    def export_instances(self):
         global_boards = []
         for brd in self.elements():
             board = brd[1]
@@ -662,10 +845,74 @@ class TCHAssembly(Assembly):
               "...]")
         return global_boards
 
-    def assembly_creation(self, stack_origin_frame, max_hi=10, max_width=4, bottom_pickup=0, col_pickup=0,
-                          distance_within_stack=0.08, distance_between_stacks=0.12, full_efficiency=True,
-                          snake=False, gluepath_width=0.04, glue_station_default_frame=None, safety_distance=None, safety_distance_gluepoints=None, dryrun=False,
-                          flipped_dropframe_distance=None, sorting_direction=1, sorting_flipped=False, bending_behaviour=None):
+    def export_component_stack(self):
+        stack = []
+        if self.geometry_created:
+            for brd in system.elements():
+                board = brd[1]
+                stack.append([board.width, board.height, board.length])
+            return stack
+        else:
+            print("Error: Geometry hasn't been created yet")
+
+    # weight calculation
+    def weight_calculator(self, protective_clay_height=5.0, density_timber=460, density_clay=2250, fill_limit=None):
+        # safety loop in the beginning
+        if not self.geometry_created:
+            print("Error: Setup not completed yet")
+            return 1
+
+        area = self.primary_length * self.secondary_length
+        protective_clay_height /= 100
+        unit_factor = 1.0
+
+        def calc_clay_volume(ar, clay_hi, timber_vol, unit_fac):
+            total_vol = (clay_hi * ar)
+            timber_vol /= unit_fac
+            return total_vol - timber_vol
+
+        # actual program
+        total_height = protective_clay_height
+        timber_volume = 0.0
+        clay_volume = 0.0
+        current_layer = 0
+
+        clay_total_height = protective_clay_height
+        clay_timber_volume = -1
+        for brd in self.elements():
+            board = brd[1]
+            if board.no_in_layer == 0:
+                current_layer += 1
+                total_height += board.height
+                if current_layer == fill_limit:
+                    clay_total_height = total_height
+                # at the beginning of the next layer, take the total timber volume
+                if current_layer == fill_limit + 1:
+                    clay_timber_volume = timber_volume
+
+            timber_volume += board.width * board.height * board.length
+            print(board.width * board.height * board.length)
+        if not fill_limit or fill_limit > current_layer:
+            clay_timber_volume = timber_volume
+            clay_total_height = total_height
+        if clay_timber_volume == -1 and fill_limit or fill_limit == 0:
+            clay_timber_volume = 0
+            clay_total_height = protective_clay_height
+        clay_volume = calc_clay_volume(area, clay_total_height, clay_timber_volume, unit_factor)
+
+        timber_volume /= unit_factor
+        total_weight = clay_volume * density_clay + timber_volume * density_timber
+        relative_weight = total_weight / area
+        total_volume = total_height * area
+        void_volume = total_volume - clay_volume - timber_volume
+
+        print("Total Weight: {} kg, Weight/sqm: {} kg, Area: {} m2, Total Volume: {} m3, \nTotal Timber Volume: {} m3, "
+              "Total Clay Volume: {} m3, Void Volume: {} m3".format(round(total_weight, 2), round(relative_weight, 2), round(area, 2),
+                                                                    round(total_volume, 2), round(timber_volume, 2), round(clay_volume, 2), round(void_volume, 2)))
+
+        return [total_weight, relative_weight, area, total_volume, timber_volume, clay_volume, void_volume]
+
+    def create_assembly_sequence(self):
 
         # creates all the gluepoints between the boards and specifies neighbour relationships
         def gluepoints():
@@ -1009,7 +1256,7 @@ class TCHAssembly(Assembly):
 
                         gluepoint_toolpoint_vector = Vector.from_start_end(my_board.tool_frame[0], absolute_glue_frame[0])
                         board_vector = Vector(my_board.tool_frame[1][0], my_board.tool_frame[1][1], my_board.tool_frame[1][2])
-                        station_vector = Vector(glue_station_default_frame[1][0], glue_station_default_frame[1][1], glue_station_default_frame[1][2])
+                        station_vector = Vector(self.glue_station_default_frame[1][0], self.glue_station_default_frame[1][1], self.glue_station_default_frame[1][2])
 
                         angle_station_board = board_vector.angle(station_vector)
                         glue_pt = Point(absolute_glue_frame[0][0], absolute_glue_frame[0][1], absolute_glue_frame[0][2])
@@ -1018,7 +1265,7 @@ class TCHAssembly(Assembly):
                         glue_point_rotated = Point(glue_point_rotated_raw[0][0], glue_point_rotated_raw[0][1], glue_point_rotated_raw[0][2])
 
                         station_gluepoint_vector = Vector.from_start_end(tool_pt, glue_point_rotated)
-                        station_gluepoint = glue_station_default_frame[0] + station_gluepoint_vector
+                        station_gluepoint = self.glue_station_default_frame[0] + station_gluepoint_vector
 
                         # consider the bending of the timber board, don't do it with a longer path unless you specify so in the bending behaviour
                         if bending:
@@ -1026,23 +1273,23 @@ class TCHAssembly(Assembly):
                                 z_deviation = bending_calculator(station_gluepoint_vector, my_board, bending)
                                 station_gluepoint[2] += z_deviation
 
-                        relative_glue_frame = Frame(station_gluepoint, glue_station_default_frame[1],
-                                                    glue_station_default_frame[2])
+                        relative_glue_frame = Frame(station_gluepoint, self.glue_station_default_frame[1],
+                                                    self.glue_station_default_frame[2])
 
                         path_frames.append(relative_glue_frame)
 
                     my_board.final_glue_frames.append(path_frames)
 
                 # some primitive sorting
-                if not sorting_flipped:
-                    if my_board.final_glue_frames[0][0][0][sorting_direction] > my_board.final_glue_frames[-1][0][0][sorting_direction]:
+                if not self.sorting_flipped:
+                    if my_board.final_glue_frames[0][0][0][self.sorting_direction] > my_board.final_glue_frames[-1][0][0][self.sorting_direction]:
                         my_board.final_glue_frames.reverse()
                 else:
-                    if my_board.final_glue_frames[0][0][0][sorting_direction] > my_board.final_glue_frames[-1][0][0][sorting_direction]:
+                    if my_board.final_glue_frames[0][0][0][self.sorting_direction] > my_board.final_glue_frames[-1][0][0][self.sorting_direction]:
                         my_board.final_glue_frames.reverse()
 
             def create_assembly_path(my_board):
-                def safety_frame_creator(my_frame, safety_dist=safety_distance):
+                def safety_frame_creator(my_frame, safety_dist=self.safety_distance):
                     my_frame_z_vector = my_frame.zaxis
                     my_frame_z_vector.scale(safety_dist * -1)
                     safety_frame = Frame(Point(my_frame[0][0] + my_frame_z_vector[0], my_frame[0][1] + my_frame_z_vector[1], my_frame[0][2] + my_frame_z_vector[2]),
@@ -1052,7 +1299,7 @@ class TCHAssembly(Assembly):
                 def flipped_safety_frame(my_frame):
                     # move the whole thing up
                     my_frame_z_vector = my_frame.zaxis
-                    my_frame_z_vector.scale(flipped_dropframe_distance * -1)
+                    my_frame_z_vector.scale(self.flipped_dropframe_distance * -1)
                     flipped_tool_point = Point(my_frame[0][0] + my_frame_z_vector[0], my_frame[0][1] + my_frame_z_vector[1], my_frame[0][2] + my_frame_z_vector[2])
 
                     # flip it now
@@ -1062,10 +1309,10 @@ class TCHAssembly(Assembly):
                     return flipped_frame
 
                 # between the gluepoints we probably don't need nearly as much safety distance
-                if not safety_distance_gluepoints:
-                    safety_distance_glue = safety_distance
+                if not self.safety_distance_gluepoints:
+                    safety_distance_glue = self.safety_distance
                 else:
-                    safety_distance_glue = safety_distance_gluepoints
+                    safety_distance_glue = self.safety_distance_gluepoints
 
                 my_board.path = {"pick_points": [], "glue_points": [], "safety_glue_point": None, "drop_points": []}
 
@@ -1086,7 +1333,7 @@ class TCHAssembly(Assembly):
                     my_board.path["glue_points"].append(safety_frame_creator(my_board.final_glue_frames[-1][-1]))
 
                     # now head to the drop zone
-                    if flipped_dropframe_distance and glue_station_default_frame:
+                    if self.flipped_dropframe_distance and self.glue_station_default_frame:
                         safety_frame_drop_flipped = flipped_safety_frame(my_board.tool_frame)
                         my_board.path["safety_glue_point"] = safety_frame_drop_flipped
 
@@ -1096,48 +1343,53 @@ class TCHAssembly(Assembly):
                 my_board.path["drop_points"].append(safety_frame_drop)
 
             # actual procedure
-            for layer_number in range(1, self.layer_no):
-                for brd in self.elements():
-                    board = brd[1]
-                    if board.layer < layer_number or dryrun:
-                        # exclude the first layer of boards
-                        create_assembly_path(board)
-                        continue
-                    elif board.layer > layer_number:
-                        break
-                    else:
-                        for i, other_brd in enumerate(self.elements()):
-                            other_board = other_brd[1]
-                            if other_board.layer < layer_number - 1:
-                                continue
-                            elif other_board.layer > layer_number - 1:
-                                break
-                            else:
-                                my_glue_surface = board_intersection(board, other_board)
-                                if my_glue_surface is None:
+            if self.assembly_sequence_set and self.geometry_created:
+                for layer_number in range(1, self.layer_no):
+                    for brd in self.elements():
+                        board = brd[1]
+                        if board.layer < layer_number or self.dryrun:
+                            # exclude the first layer of boards
+                            create_assembly_path(board)
+                            continue
+                        elif board.layer > layer_number:
+                            break
+                        else:
+                            for i, other_brd in enumerate(self.elements()):
+                                other_board = other_brd[1]
+                                if other_board.layer < layer_number - 1:
                                     continue
-                                board.glue_surfaces.append(my_glue_surface)
-                                if snake:
-                                    board.glue_paths.append(gluepath_creator(my_glue_surface, gluepath_width, board))
+                                elif other_board.layer > layer_number - 1:
+                                    break
                                 else:
-                                    board.glue_paths.append(gluepoint_creator(my_glue_surface, board, other_board))
-                                self.network.edge[board.global_count][i] = self.network.node[other_board.global_count]
+                                    my_glue_surface = board_intersection(board, other_board)
+                                    if my_glue_surface is None:
+                                        continue
+                                    board.glue_surfaces.append(my_glue_surface)
+                                    if self.glue_snake:
+                                        board.glue_paths.append(gluepath_creator(my_glue_surface, self.gluepath_width, board))
+                                    else:
+                                        board.glue_paths.append(gluepoint_creator(my_glue_surface, board, other_board))
+                                    self.network.edge[board.global_count][i] = self.network.node[other_board.global_count]
 
-                    if glue_station_default_frame:
-                        relative_gluepoints_converter(board, bending_behaviour, gluestation=True)
-                    else:
-                        relative_gluepoints_converter(board, gluestation=False)
-                    if safety_distance:
-                        create_assembly_path(board)
-                    else:
-                        print("Warning: No assembly path created because no Safety Distance was given")
-            return self
+                        if self.glue_station_default_frame:
+                            print("going with gluestation")
+                            relative_gluepoints_converter(board, self.bending_behaviour, gluestation=True)
+                        else:
+                            print("going without gluestation")
+                            relative_gluepoints_converter(board, gluestation=False)
+                        if self.safety_distance:
+                            create_assembly_path(board)
+                        else:
+                            print("Warning: No assembly path created because no Safety Distance was given")
+                return self
+            else:
+                print("Error: Assembly Sequence Parameters not set yet")
 
         def stack_creator(max_height):
-            instances = self.component_instances_export()
+            instances = self.export_instances()
             stacks = []
-            bottom_row_pickup_z = bottom_pickup
-            first_column_position = col_pickup
+            bottom_row_pickup_z = self.stack_bottom_pickup
+            first_column_position = self.stack_col_pickup
             # since leftover pieces are often put on top
             max_height -= 1
             for profile in instances:
@@ -1169,7 +1421,7 @@ class TCHAssembly(Assembly):
                         first_board_picked = 0
 
                     # in case one wants to make life easier and just fill up stack to complete rows
-                    if not full_efficiency:
+                    if not self.stack_full_efficiency:
                         first_board_picked = 0
                     new_stack = {"profile_width": profile_width, "profile_height": profile_height,
                                  "profile_length": profile_length, "no_elements": no_elements,
@@ -1178,8 +1430,8 @@ class TCHAssembly(Assembly):
                                  "first_row_position": bottom_row_pickup_z + profile_height}
                     # print(new_stack)
                     stacks.append(new_stack)
-                    first_column_position += no_columns * profile_width + (no_columns // max_width) * distance_within_stack \
-                                             + distance_between_stacks
+                    first_column_position += no_columns * profile_width + (no_columns // self.max_stack_width) * self.distance_between_stacks \
+                                             + self.distance_between_stacks
 
 
             # now that the stacks have been created, we can assign boards to them
@@ -1207,24 +1459,24 @@ class TCHAssembly(Assembly):
                         my_stack["next_board"] += 1
 
                         pick_x = my_stack["profile_length"] / 2
-                        pick_y = my_stack["first_column_position"] + col * my_stack["profile_width"] + col // max_width * distance_within_stack
+                        pick_y = my_stack["first_column_position"] + col * my_stack["profile_width"] + col // self.max_stack_width * self.distance_between_stacks
                         pick_z = row * my_stack["profile_height"] + my_stack["profile_height"]
-                        stack_origin_point = stack_origin_frame[0]
-                        pick_point = vector_point_addition([stack_origin_point, stack_origin_frame[1] * pick_x,
-                                                            stack_origin_frame[2] * pick_y, Vector(0, 0, 1) * pick_z])
-                        #pick_vector = Vector(stack_origin_frame[1]) * pick_x + stack_origin_frame[2] * pick_y + Vector(0, 0, 1) * pick_z
-                        #pick_point = (stack_origin_point + stack_origin_frame[1] * pick_x + stack_origin_frame[2] * pick_y +
+                        stack_origin_point = self.stack_origin_frame[0]
+                        pick_point = vector_point_addition([stack_origin_point, self.stack_origin_frame[1] * pick_x,
+                                                            self.stack_origin_frame[2] * pick_y, Vector(0, 0, 1) * pick_z])
+                        #pick_vector = Vector(self.stack_origin_frame[1]) * pick_x + self.stack_origin_frame[2] * pick_y + Vector(0, 0, 1) * pick_z
+                        #pick_point = (stack_origin_point + self.stack_origin_frame[1] * pick_x + self.stack_origin_frame[2] * pick_y +
                          #             Vector(0, 0, 1) * pick_z)
                         #pick_point = Point(stack_origin_point[0] + pick_vector[0], stack_origin_point[1] + pick_vector[1], stack_origin_point[2] + pick_vector[2])
-                        stack_pick_fram = Frame(pick_point, stack_origin_frame[1], stack_origin_frame[2])
+                        stack_pick_fram = Frame(pick_point, self.stack_origin_frame[1], self.stack_origin_frame[2])
                         stack_center_fram = Frame(Point(pick_point[0], pick_point[1], pick_point[2] - my_stack["profile_height"] / 2),
-                                                  stack_origin_frame[1], stack_origin_frame[2])
+                                                  self.stack_origin_frame[1], self.stack_origin_frame[2])
                         my_board.stack_pick_frame = stack_pick_fram
                         my_board.stack_center_frame = stack_center_fram
                         my_board.stack_index = stack_id
                         # print("stack_id:{}, no_in_stack:{}, column:{}, row: {}".format(stack_id, no_in_stack, col, row))
 
-        stack_creator(max_hi)
+        stack_creator(self.max_stack_height)
         gluepoints()
         print("hello")
 
@@ -1232,7 +1484,12 @@ origin_point = Point(0, 0, 0)
 origin_vector_primary = Vector(0, 1, 0)
 origin_vector_secondary = Vector(1, 0, 0)
 origin_frame = Frame(origin_point, origin_vector_primary, origin_vector_secondary)
-my_floorslab = TCHAssembly(5, 0.01, 3.0, 2.5, True, 0.06, 0.04, 0.06, 0.04, 0.06, 0.04, 0.1, 0.9, 2, 0.2, 1.1, True, origin_frame, True, True, 0.04, 0.04)
+#my_floorslab = TCHAssembly(5, 0.01, 3.0, 2.5, True, 0.06, 0.04, 0.06, 0.04, 0.06, 0.04, 0.1, 0.9, 2, 0.2, 1.1, True, origin_frame, True, True, 0.04, 0.04)
 
-my_floorslab.floorslab_geometry_creation()
-my_floorslab.assembly_creation(origin_frame, safety_distance=0.4)
+#my_floorslab.floorslab_geometry_creation()
+#my_floorslab.assembly_creation(origin_frame, self.safety_distance=0.4)
+
+my_floorslab = TCHAssembly()
+my_board_formats = {"prim_board_outside_dimensions": [0.06, 0.04], "sec_board_inside_dimensions": [0.06, 0.04]}
+
+my_floorslab.set_board_formats(my_board_formats)
