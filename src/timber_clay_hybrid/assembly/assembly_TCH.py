@@ -1381,6 +1381,7 @@ class TCHAssembly(Assembly):
                             create_assembly_path(board)
                         else:
                             print("Warning: No assembly path created because no Safety Distance was given")
+                        print(board.path)
                 return self
             else:
                 print("Error: Assembly Sequence Parameters not set yet")
@@ -1484,12 +1485,19 @@ origin_point = Point(0, 0, 0)
 origin_vector_primary = Vector(0, 1, 0)
 origin_vector_secondary = Vector(1, 0, 0)
 origin_frame = Frame(origin_point, origin_vector_primary, origin_vector_secondary)
-#my_floorslab = TCHAssembly(5, 0.01, 3.0, 2.5, True, 0.06, 0.04, 0.06, 0.04, 0.06, 0.04, 0.1, 0.9, 2, 0.2, 1.1, True, origin_frame, True, True, 0.04, 0.04)
 
-#my_floorslab.floorslab_geometry_creation()
-#my_floorslab.assembly_creation(origin_frame, self.safety_distance=0.4)
+grid_dictionary = {'secondary_interval_development': 1.2, 'layer_no': 5, 'primary_interval': 0.12, 'gap_min': 0.0, 'primary_length': 3.0, 'secondary_interval': 0.29999999999999999, 'secondary_length': 0.62, 'skip_centrals': 2}
+boards_dictionary = {'prim_board_inside_dimensions': [0.059999999999999998, 0.040000000000000001], 'prim_board_outside_dimensions': [0.059999999999999998, 0.040000000000000001], 'sec_board_inside_dimensions': [0.059999999999999998, 0.040000000000000001]}
+verts_dictionary = {'vertical_support_interlock': 0.059999999999999998, 'sec_vert_sup': False, 'prim_vert_sup': False, 'vertical_support_width': 0.059999999999999998}
+omni_dictionary = {'primary_falloff': 1.0, 'primary_dedensification': 3.0}
+baseplane_dictionary = {'origin_frame': Frame(Point(3.000, 1.200, -0.450), Vector(-1.000, 0.000, 0.000), Vector(0.000, 1.000, 0.000))}
+assembly_sequence_dic = {'dryrun': False, 'bending_factor': 0.59999999999999998, 'safe_level_distance_flipped': 2.0, 'snakelines': False, 'safe_level_distance': 0.40000000000000002, 'glue_station_default_frame': Frame(Point(4.300, 0.200, 1.300), Vector(0.000, 1.000, 0.000), Vector(-1.000, 0.000, 0.000)), 'safe_level_distance_glue': 0.050000000000000003, 'stack_origin_frame': Frame(Point(-0.400, -1.100, -0.490), Vector(1.000, 0.000, 0.000), Vector(0.000, -1.000, 0.000)), 'glue_path_width': 0.0050000000000000001, 'safety_distance': 0.5, 'bending_calc_includes_lines': True, 'tool_width_bending': 0.5}
 
 my_floorslab = TCHAssembly()
-my_board_formats = {"prim_board_outside_dimensions": [0.06, 0.04], "sec_board_inside_dimensions": [0.06, 0.04]}
-
-my_floorslab.set_board_formats(my_board_formats)
+my_floorslab.set_grid(grid_dictionary)
+my_floorslab.set_board_formats(boards_dictionary)
+my_floorslab.set_base_plane(baseplane_dictionary)
+my_floorslab.create_assembly_geometry()
+my_floorslab.set_assembly_sequence_parameters(assembly_sequence_dic)
+my_floorslab.create_assembly_sequence()
+print("I'm finally done")
