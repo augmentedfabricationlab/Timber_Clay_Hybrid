@@ -102,7 +102,8 @@ class TCHAssembly(Assembly):
         self.primary_inside_support_layers = None
 
         # Assembly Sequence
-        self.assembly_sequence_set = False
+        self.assembly_glue_set = False
+        self.assembly_stack_set = False
         self.stack_origin_frame = None
         self.max_stack_height = None
         self.max_stack_width = None
@@ -122,7 +123,7 @@ class TCHAssembly(Assembly):
         self.bending_behaviour = None
         self.geometry_created = False
 
-    def set_grid(self, grid_setup):
+    def set_grid_parameters(self, grid_setup):
         self.grid_set = True
         self.layer_no = grid_setup["layer_no"]
         self.primary_length = grid_setup["primary_length"]
@@ -252,16 +253,8 @@ class TCHAssembly(Assembly):
         else:
             print("Warning: Advanced setup ignored because board formats and/or grid were not set up yet.")
 
-    def set_assembly_sequence_parameters(self, assembly_sequence_setup):
-        self.assembly_sequence_set = True
-        self.stack_origin_frame = assembly_sequence_setup["stack_origin_frame"]
-        self.max_stack_height = optional_parameter_setup(assembly_sequence_setup, "max_stack_height", 10)
-        self.max_stack_width = optional_parameter_setup(assembly_sequence_setup, "max_stack_width", 4)
-        self.stack_bottom_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_bottom_pickup", 0)
-        self.stack_col_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_col_pickup", 0)
-        self.distance_between_stacks = optional_parameter_setup(assembly_sequence_setup, "distance_between_stacks", 0.08)
-        self.distance_between_stacks = optional_parameter_setup(assembly_sequence_setup, "distance_between_stacks", 0.12)
-        self.stack_full_efficiency = optional_parameter_setup(assembly_sequence_setup, "stack_full_efficiency", True)
+    def set_assembly_glue_parameters(self, assembly_sequence_setup):
+        self.assembly_glue_set = True
         self.glue_snake = optional_parameter_setup(assembly_sequence_setup, "glue_snake", False)
         self.gluepath_width = optional_parameter_setup(assembly_sequence_setup, "gluepath_width", .004)
         self.glue_station_default_frame = optional_parameter_setup(assembly_sequence_setup, "glue_station_default_frame", None)
@@ -272,6 +265,17 @@ class TCHAssembly(Assembly):
         self.sorting_direction = optional_parameter_setup(assembly_sequence_setup, "sorting_direction", 1)
         self.sorting_flipped = optional_parameter_setup(assembly_sequence_setup, "sorting_flipped", False)
         self.bending_behaviour = optional_parameter_setup(assembly_sequence_setup, "bending_behaviour", None)
+
+    def set_assembly_stack_parameters(self, assembly_sequence_setup):
+        self.assembly_stack_set = True
+        self.stack_origin_frame = assembly_sequence_setup["stack_origin_frame"]
+        self.max_stack_height = optional_parameter_setup(assembly_sequence_setup, "max_stack_height", 10)
+        self.max_stack_width = optional_parameter_setup(assembly_sequence_setup, "max_stack_width", 4)
+        self.stack_bottom_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_bottom_pickup", 0)
+        self.stack_col_pickup = optional_parameter_setup(assembly_sequence_setup, "stack_col_pickup", 0)
+        self.distance_between_stacks = optional_parameter_setup(assembly_sequence_setup, "distance_between_stacks", 0.12)
+        self.stack_full_efficiency = optional_parameter_setup(assembly_sequence_setup, "stack_full_efficiency", True)
+
 
     # default setup that collects the relevant functions
     def create_assembly_geometry(self):
@@ -856,7 +860,7 @@ class TCHAssembly(Assembly):
             print("Error: Geometry hasn't been created yet")
 
     # weight calculation
-    def weight_calculator(self, protective_clay_height=5.0, density_timber=460, density_clay=2250, fill_limit=None):
+    def calculate_weight(self, protective_clay_height=5.0, density_timber=460, density_clay=2250, fill_limit=None):
         # safety loop in the beginning
         if not self.geometry_created:
             print("Error: Setup not completed yet")
@@ -1285,7 +1289,7 @@ class TCHAssembly(Assembly):
                     if my_board.final_glue_frames[0][0][0][self.sorting_direction] > my_board.final_glue_frames[-1][0][0][self.sorting_direction]:
                         my_board.final_glue_frames.reverse()
                 else:
-                    if my_board.final_glue_frames[0][0][0][self.sorting_direction] > my_board.final_glue_frames[-1][0][0][self.sorting_direction]:
+                    if my_board.final_glue_frames[0][0][0][self.sorting_direction] < my_board.final_glue_frames[-1][0][0][self.sorting_direction]:
                         my_board.final_glue_frames.reverse()
 
             def create_assembly_path(my_board):
@@ -1343,7 +1347,7 @@ class TCHAssembly(Assembly):
                 my_board.path["drop_points"].append(safety_frame_drop)
 
             # actual procedure
-            if self.assembly_sequence_set and self.geometry_created:
+            if self.assembly_glue_set and self.assembly_stack_set and self.geometry_created:
                 for layer_number in range(1, self.layer_no):
                     for brd in self.elements():
                         board = brd[1]
@@ -1477,27 +1481,31 @@ class TCHAssembly(Assembly):
                         my_board.stack_index = stack_id
                         # print("stack_id:{}, no_in_stack:{}, column:{}, row: {}".format(stack_id, no_in_stack, col, row))
 
-        stack_creator(self.max_stack_height)
-        gluepoints()
-        print("hello")
+        if self.assembly_stack_set and self.assembly_glue_set:
+            stack_creator(self.max_stack_height)
+            gluepoints()
+        else:
+            print("Not all assembly parameters set up yet. Sequence not calculated.")
 
+"""
+FOR TESTING
 origin_point = Point(0, 0, 0)
 origin_vector_primary = Vector(0, 1, 0)
 origin_vector_secondary = Vector(1, 0, 0)
 origin_frame = Frame(origin_point, origin_vector_primary, origin_vector_secondary)
 
-grid_dictionary = {'secondary_interval_development': 1.2, 'layer_no': 5, 'primary_interval': 0.12, 'gap_min': 0.0, 'primary_length': 3.0, 'secondary_interval': 0.29999999999999999, 'secondary_length': 0.62, 'skip_centrals': 2}
+grid_dictionary = {'secondary_interval_development': 1.2, 'layer_no': 5, 'primary_interval': 0.12, 'gap_min': 0.0, 'primary_length': 5.0, 'secondary_interval': 0.29999999999999999, 'secondary_length': 2.5, 'skip_centrals': 3}
 boards_dictionary = {'prim_board_inside_dimensions': [0.059999999999999998, 0.040000000000000001], 'prim_board_outside_dimensions': [0.059999999999999998, 0.040000000000000001], 'sec_board_inside_dimensions': [0.059999999999999998, 0.040000000000000001]}
 verts_dictionary = {'vertical_support_interlock': 0.059999999999999998, 'sec_vert_sup': False, 'prim_vert_sup': False, 'vertical_support_width': 0.059999999999999998}
 omni_dictionary = {'primary_falloff': 1.0, 'primary_dedensification': 3.0}
 baseplane_dictionary = {'origin_frame': Frame(Point(3.000, 1.200, -0.450), Vector(-1.000, 0.000, 0.000), Vector(0.000, 1.000, 0.000))}
-assembly_sequence_dic = {'dryrun': False, 'bending_factor': 0.59999999999999998, 'safe_level_distance_flipped': 2.0, 'snakelines': False, 'safe_level_distance': 0.40000000000000002, 'glue_station_default_frame': Frame(Point(4.300, 0.200, 1.300), Vector(0.000, 1.000, 0.000), Vector(-1.000, 0.000, 0.000)), 'safe_level_distance_glue': 0.050000000000000003, 'stack_origin_frame': Frame(Point(-0.400, -1.100, -0.490), Vector(1.000, 0.000, 0.000), Vector(0.000, -1.000, 0.000)), 'glue_path_width': 0.0050000000000000001, 'safety_distance': 0.5, 'bending_calc_includes_lines': True, 'tool_width_bending': 0.5}
 
 my_floorslab = TCHAssembly()
-my_floorslab.set_grid(grid_dictionary)
+my_floorslab.set_grid_parameters(grid_dictionary)
 my_floorslab.set_board_formats(boards_dictionary)
 my_floorslab.set_base_plane(baseplane_dictionary)
 my_floorslab.create_assembly_geometry()
-my_floorslab.set_assembly_sequence_parameters(assembly_sequence_dic)
-my_floorslab.create_assembly_sequence()
+#my_floorslab.set_assembly_sequence_parameters(assembly_sequence_dic)
+#my_floorslab.create_assembly_sequence()
 print("I'm finally done")
+"""
